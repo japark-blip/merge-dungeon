@@ -1,0 +1,195 @@
+<title>Forge & Duel 원형</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* 배치: 한 화면 세로 기둥. 위는 대결(영웅 대 몬스터와 예고), 아래는 4x4 대장간 보드. 회색 상자 원형이라 색은 종류 구분과 위험 표시에만 쓴다. */
+  :root {
+    --bg: #eceef0; --panel: #f8f9fa; --line: #b9bfc6; --fg: #1d2329; --mute: #5c6670;
+    --sword: #dfe3e8; --shield: #d3dbe6; --potion: #d8e4da; --coin: #e8e3d0;
+    --danger: #b3261e; --danger-bg: #f6dedb; --hp: #4b5560; --ok: #2f6b3c;
+    --font: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15181b; --panel: #1e2226; --line: #4a525a; --fg: #e8ebee; --mute: #9aa4ae;
+    --sword: #2b3036; --shield: #27303b; --potion: #26322a; --coin: #34301f;
+    --danger: #ff8a80; --danger-bg: #3a1f1d; --hp: #aab4be; --ok: #7fc48d; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #15181b; --panel: #1e2226; --line: #4a525a; --fg: #e8ebee; --mute: #9aa4ae;
+    --sword: #2b3036; --shield: #27303b; --potion: #26322a; --coin: #34301f;
+    --danger: #ff8a80; --danger-bg: #3a1f1d; --hp: #aab4be; --ok: #7fc48d; color-scheme: dark }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); padding-block: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .wrap { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .top h1 { font-size: 16px; margin: 0; font-weight: 700; }
+  .top .stat { font-family: var(--mono); font-size: 13px; color: var(--mute); font-variant-numeric: tabular-nums; }
+  .duel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .unit { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .unit .name { font-weight: 700; font-size: 14px; }
+  .unit .sub { font-size: 12px; color: var(--mute); min-height: 16px; }
+  .bar { height: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--hp); transition: width .15s; }
+  .num { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .intent { font-size: 13px; font-weight: 700; }
+  .enemy.soon { border-color: var(--danger); background: var(--danger-bg); }
+  .enemy.soon .intent { color: var(--danger); }
+  .pips { display: flex; gap: 4px; }
+  .pips i { width: 12px; height: 12px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); }
+  .pips i.on { background: var(--fg); border-color: var(--fg); }
+  .enemy.soon .pips i.on { background: var(--danger); border-color: var(--danger); }
+  .flash { animation: flash .25s; }
+  @keyframes flash { from { outline: 3px solid var(--danger); } to { outline: 3px solid transparent; } }
+  .log { font-size: 13px; color: var(--mute); min-height: 18px; text-align: center; }
+  .board { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .cell { aspect-ratio: 1; border: 1px dashed var(--line); border-radius: 4px; background: transparent; color: var(--fg); font: inherit; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .cell.t { border-style: solid; cursor: pointer; }
+  .cell.S { background: var(--sword); } .cell.H { background: var(--shield); } .cell.P { background: var(--potion); } .cell.C { background: var(--coin); }
+  .cell .k { font-size: 13px; color: var(--mute); }
+  .cell .v { font-family: var(--mono); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cell.kill { border: 2px solid var(--fg); }
+  .cell.kill .k { color: var(--fg); font-weight: 700; }
+  .cell:focus-visible, button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .over { position: absolute; inset: 0; background: var(--panel); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 16px; }
+  .over b { font-size: 18px; }
+  button.act { font: inherit; font-weight: 700; padding: 10px 16px; border: 1px solid var(--fg); border-radius: 6px; background: var(--fg); color: var(--bg); cursor: pointer; }
+  .help { font-size: 12.5px; color: var(--mute); line-height: 1.6; }
+  .help b { color: var(--fg); }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  button.ghost { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { .flash { animation: none; } .bar > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <h1>Forge & Duel <span class="stat">원형</span></h1>
+    <span class="stat" id="stat"></span>
+  </div>
+
+  <div class="duel">
+    <div class="unit" id="hero">
+      <div class="name">영웅</div>
+      <div class="bar"><i id="hpbar"></i></div>
+      <div class="num" id="hptxt"></div>
+      <div class="sub" id="blocktxt"></div>
+    </div>
+    <div class="unit enemy" id="enemy">
+      <div class="name" id="ename"></div>
+      <div class="bar"><i id="ebar"></i></div>
+      <div class="num" id="etxt"></div>
+      <div class="intent" id="intent"></div>
+      <div class="pips" id="pips"></div>
+    </div>
+  </div>
+
+  <div class="log" id="log" aria-live="polite"></div>
+
+  <div class="board" id="board"></div>
+
+  <div class="row">
+    <span class="stat" id="best"></span>
+    <button class="ghost" id="restart" type="button">처음부터</button>
+  </div>
+
+  <div class="help">
+    <b>밀기</b>(방향키, 스와이프)는 한 턴입니다. 같은 종류, 같은 숫자끼리 합쳐집니다.
+    <b>누르기</b>는 타일을 씁니다. 턴이 흐르지 않습니다.<br>
+    검은 몬스터를 벱니다. 방패는 다음 공격을 막습니다. 물약은 회복, 동전은 금(10마다 최대 체력 +2).<br>
+    합칠수록 값이 커집니다(검과 동전 1, 3, 7, 15 · 방패와 물약 2, 4, 8, 16). 남는 피해와 남는 방어는 사라집니다.
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const KIND = { S: '검', H: '방패', P: '물약', C: '동전' };
+  const ENEMY = { slime: '슬라임', bat: '박쥐', golem: '골렘', boss: '보스' };
+  let s, best = 0, hpMaxE = 1;
+  try { best = Number(localStorage.getItem('fd-proto-best')) || 0; } catch (e) {}
+
+  function start() { s = FD.newGame(); hpMaxE = s.enemy.hp; render('밀어서 합치고, 눌러서 쓰세요.'); }
+
+  function describe(ev) {
+    return ev.map((e) => {
+      if (e.type === 'strike') return '검으로 ' + e.dmg + ' 피해';
+      if (e.type === 'kill') return ENEMY[e.kind] + ' 처치';
+      if (e.type === 'block') return '방어 +' + e.v;
+      if (e.type === 'heal') return '체력 +' + e.v;
+      if (e.type === 'gold') return '금 +' + e.v;
+      if (e.type === 'bonus') return '최대 체력 +' + e.v;
+      if (e.type === 'hit') return e.dmg ? '맞았다: ' + e.dmg + ' 피해' + (e.blocked ? ' (' + e.blocked + ' 막음)' : '') : '공격을 전부 막았다';
+      if (e.type === 'merge') return '합치기 ' + e.n;
+      return '';
+    }).filter(Boolean).join(' · ');
+  }
+
+  function render(msg) {
+    const e = s.enemy;
+    $('stat').textContent = s.room + '번째 방 · 금 ' + s.gold + ' · ' + s.turns + '턴';
+    $('hpbar').style.width = Math.max(0, (s.hp / s.maxHp) * 100) + '%';
+    $('hptxt').textContent = '체력 ' + s.hp + ' / ' + s.maxHp;
+    $('blocktxt').textContent = s.block ? '방어 ' + s.block + ' (다음 공격까지)' : '방어 없음';
+    $('ename').textContent = ENEMY[e.kind];
+    if (e.hp > hpMaxE) hpMaxE = e.hp;
+    $('ebar').style.width = Math.max(0, (e.hp / hpMaxE) * 100) + '%';
+    $('etxt').textContent = '체력 ' + e.hp;
+    const net = Math.max(0, e.atk - s.block);
+    $('intent').textContent = e.timer + '턴 뒤 ' + e.atk + ' 피해' + (s.block ? ' → 방어 후 ' + net : '');
+    $('enemy').classList.toggle('soon', e.timer <= 1);
+    $('pips').innerHTML = Array.from({ length: e.cd }, (_, i) => '<i' + (i < e.timer ? ' class="on"' : '') + '></i>').join('');
+    $('log').textContent = msg != null ? msg : describe(s.events);
+
+    const b = $('board'); b.innerHTML = '';
+    s.grid.forEach((c, i) => {
+      const el = document.createElement(c ? 'button' : 'div');
+      el.className = 'cell' + (c ? ' t ' + c.t : '');
+      el.dataset.i = i;
+      if (c) {
+        el.type = 'button';
+        const v = FD.power(c), kill = c.t === 'S' && v >= e.hp;
+        if (kill) el.classList.add('kill');
+        el.innerHTML = '<span class="k">' + (kill ? '처치' : KIND[c.t]) + '</span><span class="v">' + v + '</span>';
+        el.setAttribute('aria-label', KIND[c.t] + ' ' + v);
+      }
+      b.appendChild(el);
+    });
+    if (s.over) {
+      const cleared = s.room - 1;
+      if (cleared > best) { best = cleared; try { localStorage.setItem('fd-proto-best', String(best)); } catch (err) {} }
+      const o = document.createElement('div'); o.className = 'over';
+      o.innerHTML = '<b>쓰러졌다</b><span>' + cleared + '개의 방을 지났다 · ' + s.turns + '턴</span><button class="act" id="again" type="button">한 판 더</button>';
+      b.appendChild(o); $('again').addEventListener('click', start); $('again').focus();
+    }
+    $('best').textContent = '최고 기록: 방 ' + best + '개';
+  }
+
+  function flash(id) { const el = $(id); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  function after(prevRoom) {
+    if (s.events.some((e) => e.type === 'hit' && e.dmg)) flash('hero');
+    if (s.events.some((e) => e.type === 'strike')) flash('enemy');
+    if (s.room !== prevRoom) hpMaxE = s.enemy.hp;
+    render();
+  }
+  function doSlide(dir) { const r = s.room; if (FD.slide(s, dir)) after(r); }
+  function doUse(i) { const r = s.room; if (FD.use(s, i)) after(r); }
+
+  const KEYS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down' };
+  window.addEventListener('keydown', (e) => { const d = KEYS[e.key]; if (d) { e.preventDefault(); doSlide(d); } });
+
+  let p0 = null;
+  const board = $('board');
+  board.addEventListener('pointerdown', (e) => { p0 = { x: e.clientX, y: e.clientY, cell: e.target.closest('.cell') }; });
+  board.addEventListener('pointerup', (e) => {
+    if (!p0) return; const dx = e.clientX - p0.x, dy = e.clientY - p0.y, cell = p0.cell; p0 = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) { doSlide(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); return; }
+    if (cell && cell.classList.contains('t')) doUse(Number(cell.dataset.i));
+  });
+  board.addEventListener('pointercancel', () => { p0 = null; });
+  // 키보드로 타일에 포커스한 뒤 Enter/Space 로 쓰기 (포인터 클릭은 위에서 처리하므로 detail 0 만 받는다)
+  board.addEventListener('click', (e) => { const cell = e.target.closest('.cell.t'); if (cell && e.detail === 0) doUse(Number(cell.dataset.i)); });
+  $('restart').addEventListener('click', start);
+
+  window.FDdebug = { get s() { return s; } };
+  start();
+})();
+</script>
