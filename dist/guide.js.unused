@@ -1,0 +1,106 @@
+// Merge Dungeon — 게임 설명 사이드바. 글 대신 '아이콘 수식' 행으로 보여준다. 넓은 화면은 캔버스 왼쪽, 좁은 화면은 ? 버튼.
+window.MD = window.MD || {};
+(function () {
+  // 행 정의: s = 스프라이트, t = 기호/텍스트, b = 배지(색 라벨). cap = 아래 캡션 (짧게)
+  const ROWS = {
+    en: [
+      { items: [{ s: 'weapon', lv: 1 }, { t: '+' }, { s: 'weapon', lv: 1 }, { t: '→' }, { s: 'weapon', lv: 2 }], cap: 'same tiles merge' },
+      { items: [{ s: 'weapon', lv: 2 }, { t: '→' }, { s: 'monster', lv: 1 }, { t: '=' }, { b: 'SLAIN', c: '#56c271' }], cap: 'higher weapon wins' },
+      { items: [{ s: 'weapon', lv: 1 }, { t: '→' }, { s: 'monster', lv: 2 }, { t: '=' }, { b: '-1 HP', c: '#e45b5b' }], cap: 'lower weapon hurts' },
+      { items: [{ s: 'potion', lv: 1 }, { t: '+' }, { s: 'potion', lv: 1 }, { t: '=' }, { b: '+3 HP', c: '#56c271' }], cap: 'potions heal' },
+      { items: [{ s: 'coin', lv: 1 }, { t: '+' }, { s: 'coin', lv: 1 }, { t: '…' }, { b: '4 → ●', c: '#f3c74f' }], cap: 'coins bank at 4' },
+      { items: [{ bar: true }, { t: '→' }, { b: 'PERK', c: '#7fc8ff' }], cap: 'fill bar · pick a perk' },
+      { items: [{ s: 'boss', lv: 1 }, { t: '←' }, { s: 'weapon', lv: 4 }], cap: 'boss every 5 floors' },
+      { items: [{ b: 'PERK LV2', c: '#7fc8ff' }, { t: '+' }, { b: 'PERK LV2', c: '#7fc8ff' }, { t: '=' }, { b: 'EVOLVE', c: '#f3c74f' }], cap: 'matching pairs fuse' },
+    ],
+    ko: [
+      { items: [{ s: 'weapon', lv: 1 }, { t: '+' }, { s: 'weapon', lv: 1 }, { t: '→' }, { s: 'weapon', lv: 2 }], cap: '같은 타일은 합쳐진다' },
+      { items: [{ s: 'weapon', lv: 2 }, { t: '→' }, { s: 'monster', lv: 1 }, { t: '=' }, { b: '처치', c: '#56c271' }], cap: '무기 레벨이 높으면 이긴다' },
+      { items: [{ s: 'weapon', lv: 1 }, { t: '→' }, { s: 'monster', lv: 2 }, { t: '=' }, { b: '-1 HP', c: '#e45b5b' }], cap: '낮으면 다친다' },
+      { items: [{ s: 'potion', lv: 1 }, { t: '+' }, { s: 'potion', lv: 1 }, { t: '=' }, { b: '+3 HP', c: '#56c271' }], cap: '물약은 회복' },
+      { items: [{ s: 'coin', lv: 1 }, { t: '+' }, { s: 'coin', lv: 1 }, { t: '…' }, { b: '4 → ●', c: '#f3c74f' }], cap: '코인은 4가 되면 지갑으로' },
+      { items: [{ bar: true }, { t: '→' }, { b: '퍽', c: '#7fc8ff' }], cap: '바를 채우면 퍽 선택' },
+      { items: [{ s: 'boss', lv: 1 }, { t: '←' }, { s: 'weapon', lv: 4 }], cap: '5층마다 보스' },
+      { items: [{ b: '퍽 LV2', c: '#7fc8ff' }, { t: '+' }, { b: '퍽 LV2', c: '#7fc8ff' }, { t: '=' }, { b: '진화', c: '#f3c74f' }], cap: '짝이 맞는 퍽은 합쳐진다' },
+    ],
+  };
+  const KEYS = { en: '← ↑ → ↓  ·  1-3 perk  ·  Z rewind  ·  M mute', ko: '← ↑ → ↓  ·  1-3 퍽  ·  Z 되감기  ·  M 음소거' };
+  const TITLE = { en: 'HOW TO PLAY', ko: 'HOW TO PLAY' };
+
+  let aside = null, toggle = null, open = false;
+  const W = 210, ROW_H = 40, SP = 28;
+
+  function rowCanvas(row) {
+    const c = document.createElement('canvas');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = W * dpr; c.height = ROW_H * dpr; c.style.width = W + 'px'; c.style.height = ROW_H + 'px';
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.imageSmoothingEnabled = false;
+    g.textBaseline = 'middle';
+    // 가운데 정렬을 위해 폭 먼저 계산
+    const widths = row.items.map((it) => {
+      if (it.s) return SP + 6;
+      if (it.bar) return 54;
+      if (it.b) { g.font = 'bold 11px system-ui, sans-serif'; return g.measureText(it.b).width + 14; }
+      g.font = 'bold 14px system-ui, sans-serif'; return g.measureText(it.t).width + 10;
+    });
+    let x = (W - widths.reduce((a, b) => a + b, 0)) / 2;
+    const cy = ROW_H / 2;
+    row.items.forEach((it, i) => {
+      const w = widths[i];
+      if (it.s) {
+        g.fillStyle = '#2f2c4c'; g.beginPath(); g.roundRect(x, cy - SP / 2 - 2, SP + 4, SP + 4, 6); g.fill();
+        g.drawImage(MD.sprites.bake(it.s, it.lv), x + 2, cy - SP / 2, SP, SP);
+        if (it.s === 'weapon' || it.s === 'monster' || it.s === 'boss') {
+          g.fillStyle = '#0f0e1c'; g.fillRect(x + SP - 6, cy + SP / 2 - 8, 10, 10);
+          g.fillStyle = '#f2efe9'; g.font = 'bold 8px system-ui, sans-serif'; g.textAlign = 'center';
+          g.fillText(String(it.lv), x + SP - 1, cy + SP / 2 - 3);
+        }
+      } else if (it.bar) {
+        g.fillStyle = '#2a2944'; g.beginPath(); g.roundRect(x + 2, cy - 6, 50, 12, 5); g.fill();
+        g.fillStyle = '#7fc8ff'; g.beginPath(); g.roundRect(x + 2, cy - 6, 50, 12, 5); g.fill();
+        g.fillStyle = 'rgba(27,26,46,0.6)'; for (let k = 1; k < 3; k++) g.fillRect(x + 2 + (50 * k) / 3 - 1, cy - 6, 2, 12);
+      } else if (it.b) {
+        g.font = 'bold 11px system-ui, sans-serif';
+        g.fillStyle = it.c; g.globalAlpha = 0.18; g.beginPath(); g.roundRect(x, cy - 11, w - 2, 22, 6); g.fill(); g.globalAlpha = 1;
+        g.textAlign = 'center'; g.fillStyle = it.c; g.fillText(it.b, x + (w - 2) / 2, cy + 0.5);
+      } else {
+        g.font = 'bold 14px system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#9a97b8';
+        g.fillText(it.t, x + w / 2, cy + 0.5);
+      }
+      x += w;
+    });
+    return c;
+  }
+
+  function titleCanvas(text) {
+    const px = 2, c = document.createElement('canvas');
+    const w = MD.pixfont.width(text, px) + 4, h = 7 * px + 4;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = w * dpr; c.height = h * dpr; c.style.width = w + 'px'; c.style.height = h + 'px';
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    MD.pixfont.draw(g, text, 2, 2, px, (ry) => ['#fff1b0', '#ffe27a', '#f7c948', '#f7c948', '#e0a52f', '#c98a17', '#a86d0e'][ry], { shadow: 1 });
+    return c;
+  }
+
+  function render() {
+    const lang = MD.i18n.getLang(), rows = ROWS[lang] || ROWS.en;
+    if (!aside) {
+      aside = document.createElement('aside'); aside.id = 'guide';
+      document.body.insertBefore(aside, document.body.firstChild);
+      toggle = document.createElement('button'); toggle.id = 'guide-toggle'; toggle.type = 'button'; toggle.textContent = '?';
+      toggle.addEventListener('click', () => { open = !open; aside.classList.toggle('open', open); toggle.classList.toggle('on', open); });
+      document.body.appendChild(toggle);
+    }
+    aside.innerHTML = '';
+    const h = document.createElement('div'); h.className = 'g-title'; h.appendChild(titleCanvas(TITLE[lang] || TITLE.en)); aside.appendChild(h);
+    rows.forEach((r) => {
+      const wrap = document.createElement('div'); wrap.className = 'g-row';
+      wrap.appendChild(rowCanvas(r));
+      const cap = document.createElement('div'); cap.className = 'g-cap'; cap.textContent = r.cap; wrap.appendChild(cap);
+      aside.appendChild(wrap);
+    });
+    const k = document.createElement('div'); k.className = 'g-keys'; k.textContent = KEYS[lang] || KEYS.en; aside.appendChild(k);
+  }
+
+  MD.guide = { render };
+})();

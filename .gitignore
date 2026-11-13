@@ -1,0 +1,5 @@
+tests/logs/
+loop/.run.json
+loop/.lock
+loop/STOP
+dist/*.zip
