@@ -3,14 +3,14 @@
   const N = 4, MAXLV = 5;
   const VAL = [0, 1, 3, 7, 15, 31];            // 레벨별 값. 합칠수록 이득(1+1 < 3)
   const CFG = {
-    hp: 20,
+    hp: 24,
     spawn: { S: 45, H: 20, P: 15, C: 20 },     // 검, 방패, 물약, 동전
     goldPerBonus: 10, bonusHp: 2,              // 금 10마다 최대 체력 +2
     enemies: {
       slime: { hp: 5, atk: 3, cd: 4 }, bat: { hp: 3, atk: 2, cd: 2 },
-      golem: { hp: 14, atk: 6, cd: 6 }, boss: { hp: 22, atk: 7, cd: 4 },
+      golem: { hp: 12, atk: 5, cd: 6 }, boss: { hp: 16, atk: 5, cd: 5 },
     },
-    hpScale: 0.18, atkScale: 0.10,
+    hpScale: 0.10, atkScale: 0.05,
   };
   function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const power = (tile) => (tile.t === 'S' || tile.t === 'C' ? VAL[tile.lv] : VAL[tile.lv] + 1);
@@ -45,10 +45,12 @@
     }
     return { grid: g, moved, merges };
   }
-  const legalSlides = (s) => ['left', 'right', 'up', 'down'].filter((d) => slideGrid(s.grid, d).moved);
+  const isEmpty = (s) => s.grid.every((c) => !c);
+  // 빈 보드에서는 어느 방향이든 '기다리기'로 인정한다 (한 턴이 흐르고 타일이 하나 나온다). 막힘 방지.
+  const legalSlides = (s) => ['left', 'right', 'up', 'down'].filter((d) => isEmpty(s) || slideGrid(s.grid, d).moved);
   function slide(s, dir) { // 밀기 = 한 턴
     if (s.over) return false;
-    const res = slideGrid(s.grid, dir); if (!res.moved) return false;
+    const res = slideGrid(s.grid, dir); if (!res.moved && !isEmpty(s)) return false;
     s.grid = res.grid; s.turns++; s.events = [];
     if (res.merges) s.events.push({ type: 'merge', n: res.merges });
     const e = s.enemy; e.timer--;

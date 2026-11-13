@@ -2,7 +2,7 @@
 const FD = require('../proto/core.js'); const RUNS = Number(process.argv[2] || 300), CAP = 3000;
 const tiles = (s, t) => s.grid.map((c, i) => (c && (!t || c.t === t) ? { i, v: FD.power(c), t: c.t, lv: c.lv } : null)).filter(Boolean);
 const policies = {
-  random(s, r) { const L = FD.legalSlides(s), T = tiles(s); if (L.length && (r() < 0.6 || !T.length)) return FD.slide(s, L[Math.floor(r() * L.length)]); return FD.use(s, T[Math.floor(r() * T.length)].i); },
+  random(s, r) { const L = FD.legalSlides(s), T = tiles(s); if (L.length && (r() < 0.6 || !T.length)) return FD.slide(s, L[Math.floor(r() * L.length)]); if (!T.length) { s.over = true; return false; } return FD.use(s, T[Math.floor(r() * T.length)].i); },
   masher(s, r, st) { const L = FD.legalSlides(s); if (!L.length) { const T = tiles(s); return FD.use(s, T[Math.floor(r() * T.length)].i); } const seq = ['left', 'down', 'right', 'down']; for (let k = 0; k < 4; k++) { const d = seq[(st.n = (st.n || 0) + 1) % 4]; if (L.includes(d)) return FD.slide(s, d); } return FD.slide(s, L[0]); },
   careful(s) {
     const e = s.enemy, S = tiles(s, 'S').sort((a, b) => a.v - b.v), H = tiles(s, 'H').sort((a, b) => a.v - b.v), P = tiles(s, 'P').sort((a, b) => b.v - a.v), C = tiles(s, 'C');

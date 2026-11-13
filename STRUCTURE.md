@@ -115,3 +115,8 @@
 - `loop/profiles/gamepix.md` 플랫폼 점검, `loop/champion/` 최고 후보, `loop/reference/` 참고 화면 (아트 작업용).
 - `tests/run.sh p0|p1|full` 검사 실행기. browser.js(부팅, 오류, 외부 통신, 완주), achievements.js(저장 이전, 업적), balance.js(실력 차, 느림). 로그는 `tests/logs/`.
 - loop/ 와 tests/ 는 게임 zip에 넣지 않는다.
+
+## proto/ (리부트 원형, 기존 게임과 분리)
+- `proto/core.js` Forge & Duel 순수 규칙: 보드는 아이템만(검 S, 방패 H, 물약 P, 동전 C), 밀기 = 한 턴, 누르기 = 사용, 몬스터 예고(timer). 수치는 CFG.
+- `proto/index.html` 회색 상자 화면 (DOM, 그림 없음). 공개 아티팩트로도 올림.
+- `tests/proto-sim.js` 무작위/연타/신중 플레이 도달 방 수, `tests/proto-browser.js` 부팅과 한 판 완주.
